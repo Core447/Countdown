@@ -65,7 +65,7 @@ class Countdown(ActionBase):
         self.show()
 
     def event_callback(self, event: InputEvent, data) -> None:
-        if event == Input.Key.Events.SHORT_UP:
+        if event in (Input.Key.Events.SHORT_UP, Input.Dial.Events.SHORT_UP, Input.Dial.Events.SHORT_TOUCH_PRESS):
             if self.start_time is None:
                 # start
                 self.start_time = time.time()
@@ -81,10 +81,24 @@ class Countdown(ActionBase):
                     self.start_time = time.time() - (self.paused_time - self.start_time)
                     self.paused_time = None
 
-        elif event == Input.Key.Events.HOLD_START:
+        elif event in (Input.Key.Events.HOLD_START, Input.Dial.Events.HOLD_START, Input.Dial.Events.LONG_TOUCH_PRESS):
             # reset and stop/pause
             self.start_time = None
             self.paused_time = None
+
+        elif event == Input.Dial.Events.TURN_CW:
+            self.duration = self.duration + 1
+            settings = self.get_settings()
+            settings["duration"] = self.duration
+            self.set_settings(settings)
+            self.show()
+
+        elif event == Input.Dial.Events.TURN_CCW:
+            self.duration = self.duration - 1
+            settings = self.get_settings()
+            settings["duration"] = self.duration
+            self.set_settings(settings)
+            self.show()
 
         else:
             return
