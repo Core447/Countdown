@@ -49,8 +49,9 @@ class Countdown(ActionBase):
 
         self.set_center_label(time_string)
 
-
-        progress = remaining_time / self.duration
+        progress = 1
+        if self.duration > 0: # avoid div by 0
+            progress = remaining_time / self.duration
         if remaining_seconds + remaining_minutes * 60 + remaining_hours * 3600 == 0:
             progress = 0
         progress_ring = create_progress_ring(floor(progress * 100) / 100, ring_color=(0, 147, 255), ring_thickness=15)
@@ -87,14 +88,14 @@ class Countdown(ActionBase):
             self.paused_time = None
 
         elif event == Input.Dial.Events.TURN_CW:
-            self.duration = self.duration + 1
+            self.duration = min(self.duration + 1, 99*60*60+59*60+59)
             settings = self.get_settings()
             settings["duration"] = self.duration
             self.set_settings(settings)
             self.show()
 
         elif event == Input.Dial.Events.TURN_CCW:
-            self.duration = self.duration - 1
+            self.duration = max(self.duration - 1, 1)
             settings = self.get_settings()
             settings["duration"] = self.duration
             self.set_settings(settings)
