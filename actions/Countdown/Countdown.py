@@ -6,6 +6,9 @@ from src.backend.PluginManager.ActionBase import ActionBase
 from src.backend.DeckManagement.DeckController import DeckController
 from src.backend.PageManagement.Page import Page
 from src.backend.PluginManager.PluginBase import PluginBase
+from autostart import is_flatpak
+import subprocess
+import multiprocessing
 
 from .progress import create_progress_ring
 
@@ -25,6 +28,7 @@ class Countdown(ActionBase):
         self.duration = 30
         self.start_time = None
         self.paused_time = None
+        self.finish_command_executed: bool = False
 
     def get_remaining_time(self) -> int:
         if self.start_time is None:
@@ -56,6 +60,26 @@ class Countdown(ActionBase):
             progress = 0
         progress_ring = create_progress_ring(floor(progress * 100) / 100, ring_color=(0, 147, 255), ring_thickness=15)
         self.set_media(image=progress_ring)
+
+        if progress == 0:
+            if not self.finish_command_executed:
+                # run command
+                command = self.get_settings().get("command")
+                self.run_command(command)
+
+            self.finish_command_executed = True
+
+    def run_command(self, command):
+        command = command.strip()
+
+        if command in [None, ""]:
+            return
+
+        if is_flatpak():
+            command = "flatpak-spawn --host " + command
+
+        p = multiprocessing.Process(target=subprocess.Popen, args=[command], kwargs={"shell": True, "start_new_session": True, "stdin": subprocess.DEVNULL, "stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL, "cwd": os.path.expanduser("~")})
+        p.start()
         
     def on_ready(self) -> None:
         settings = self.get_settings()
@@ -71,6 +95,7 @@ class Countdown(ActionBase):
                 # start
                 self.start_time = time.time()
                 self.paused_time = None
+                self.finish_command_executed = False
 
             else:
                 # pause/resume
@@ -110,16 +135,20 @@ class Countdown(ActionBase):
         self.time_row.set_title("Duration (seconds)")
         self.time_row.set_subtitle("Duration of the countdown")
 
+        self.command_row = Adw.EntryRow(title="Command to run after end of timer")
+
         self.load_config_values()
 
         self.time_row.connect("changed", self.on_time_row_changed)
+        self.command_row.connect("notify::text", self.on_command_change)
 
-        return [self.time_row]
+        return [self.time_row, self.command_row]
     
     def load_config_values(self) -> None:
         settings = self.get_settings()
 
         self.time_row.set_value(settings.get("duration", 30))
+        self.command_row.set_text(settings.get("command", ""))
 
     def on_time_row_changed(self, *args) -> None:
         settings = self.get_settings()
@@ -129,3 +158,8 @@ class Countdown(ActionBase):
         self.set_settings(settings)
 
         self.show()
+
+    def on_command_change(self, *args) -> None:
+        settings = self.get_settings()
+        settings["command"] = self.command_row.get_text()
+        self.set_settings(settings)
